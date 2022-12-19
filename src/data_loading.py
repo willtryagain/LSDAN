@@ -59,7 +59,7 @@ def parse_data(dataset, verbose=True):
         lines = f.readlines()
 
     seen_edges = set()
-    source_ids, target_ids = []
+    source_ids, target_ids = [], []
     for line in lines:
         row = line.strip().split('\t')
         u = int(row[0])
@@ -69,7 +69,7 @@ def parse_data(dataset, verbose=True):
             source_ids.append(u)
             target_ids.append(v)
 
-    edge_index = np.row_stack((source_ids, target_ids))
+    edge_index = torch.from_numpy(np.row_stack((source_ids, target_ids)))
 
     # E = np.array(E)
     # A = sparse.coo_matrix(
@@ -89,3 +89,22 @@ def parse_data(dataset, verbose=True):
         print("#Classes:", y.max() + 1)
     
     return x, edge_index, y
+
+def make_binary(y, class_label, p):
+    mask = y == class_label
+    y_binary_test = mask.astype(int)
+    y_binary_train = np.zeros_like(y_binary_test)
+    P = np.nonzero(mask)[0]
+    N = np.nonzero(~mask)[0]
+    k = len(P)
+    N_equal = np.random.choice(N, k, False)
+    indices = np.concatenate((P, N_equal))
+    P_train = np.random.choice(P, int(k * p), False) #TODO: check ceil/floor
+    y_binary_train[P_train] = 1
+
+    np.random.shuffle(indices)
+    indices = torch.from_numpy(indices)
+    y_binary_train = torch.from_numpy(y_binary_train)
+    y_binary_test = torch.from_numpy(y_binary_test)
+
+    return indices, y_binary_train, y_binary_test
