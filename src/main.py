@@ -1,4 +1,5 @@
 import random
+import argparse
 
 import torch
 from torch import nn
@@ -13,32 +14,44 @@ from utils import *
 from data_loading import parse_data, make_binary
 from loss import PULoss
 
+
+parser = argparse.ArgumentParser(description='PyTorch LSDAN')
+parser.add_argument('--dropout', default=0.5, type=float)
+parser.add_argument('--dataset', default='cora', type=str)
+parser.add_argument('--p', default=0.05, type=float)
+
+
+
+parser.add_argument('--bias', action='store_true')
+parser.add_argument('--nnpu', action='store_true')
+
+parser.add_argument('--add_skip_connection', action='store_true')
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+args = parser.parse_args()
 
 config = {
     "num_of_layers": 2,  # GNNs, contrary to CNNs, are often shallow (it ultimately depends on the graph properties)
     "num_heads_per_layer": [8, 1],
     "num_features_per_layer": [CORA_NUM_INPUT_FEATURES, 64, 1],
-    "add_skip_connection": True,  # hurts perf on Cora
-    "bias": True,  # result is not so sensitive to bias
-    "dropout": 0.9,  # result is sensitive to dropout
+    "add_skip_connection": args.bias,  # hurts perf on Cora
+    "bias": args.add_skip_connection,  # result is not so sensitive to bias
+    "dropout": args.dropout,  # result is sensitive to dropout
     "layer_type": LayerType.IMP3,  # fastest implementation enabled by default
     "num_of_epochs": 500,
-    "p": 0.05
+    "p": args.p
 }
 
+if args.dataset == "citeseer":
+    config["num_features_per_layer"][0] = 3703
 
-criteria = nn.BCELoss(reduction='mean')
 
-# for epoch in range(config['num_of_epochs']):
-dataset = 'cora'
+dataset = args.dataset
 x_, edge_index_, y_ = parse_data(dataset, False)
 
 
-
-
 f1_scores = []
-
 
 N_ITER = 10
 
@@ -103,7 +116,7 @@ for i in range(N_ITER):
 
     num_epochs = config["num_of_epochs"]
     epoch = 0
-    nnpu = False
+    nnpu = args.nnpu
     verbose = False
     while True:
         cur_loss = train(epoch, False, nnpu)
@@ -113,6 +126,6 @@ for i in range(N_ITER):
         epoch += 1
 
     f1_scores.append(test(verbose, nnpu))
-    print(f1_scores[-1])
+    # print(f1_scores[-1])
 
 print(config["p"], np.mean(f1_scores),'±' ,np.std(f1_scores))

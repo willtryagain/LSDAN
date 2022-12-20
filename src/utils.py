@@ -5,7 +5,7 @@
 
 import os
 import enum
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 
 
@@ -42,7 +42,7 @@ class VisualizationType(enum.Enum):
     ENTROPY = 2,
 
 
-writer = SummaryWriter()  # (tensorboard) writer will output to ./runs/ directory by default
+# writer = SummaryWriter()  # (tensorboard) writer will output to ./runs/ directory by default
 
 
 # Global vars used for early stopping. After some number of epochs (as defined by the patience_period var) without any
