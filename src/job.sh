@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -A research
-#SBATCH -n 40
+#SBATCH -n 38
 #SBATCH --gres=gpu:4
 #SBATCH --mem-per-cpu=2048
 #SBATCH --output=op_file.txt
@@ -33,5 +33,3 @@ conda activate g
 cd src
 ls
 python run.py
-
-

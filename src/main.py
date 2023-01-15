@@ -19,12 +19,8 @@ parser = argparse.ArgumentParser(description='PyTorch LSDAN')
 parser.add_argument('--dropout', default=0.5, type=float)
 parser.add_argument('--dataset', default='cora', type=str)
 parser.add_argument('--p', default=0.05, type=float)
-
-
-
 parser.add_argument('--bias', action='store_true')
 parser.add_argument('--nnpu', action='store_true')
-
 parser.add_argument('--add_skip_connection', action='store_true')
 
 
@@ -34,24 +30,26 @@ args = parser.parse_args()
 config = {
     "num_of_layers": 2,  # GNNs, contrary to CNNs, are often shallow (it ultimately depends on the graph properties)
     "num_heads_per_layer": [8, 1],
-    "num_features_per_layer": [CORA_NUM_INPUT_FEATURES, 64, 1],
     "add_skip_connection": args.bias,  # hurts perf on Cora
     "bias": args.add_skip_connection,  # result is not so sensitive to bias
     "dropout": args.dropout,  # result is sensitive to dropout
     "layer_type": LayerType.IMP3,  # fastest implementation enabled by default
     "num_of_epochs": 500,
-    "p": args.p
+    "p": args.p,
 }
 
 if args.dataset == "citeseer":
-    config["num_features_per_layer"][0] = 3703
-
+    config['class_label'] = 2
+    config["num_features_per_layer"] = [3703, 64, 1]
+elif args.dataset == "cora":
+    config['class_label'] = 3
+    config["num_features_per_layer"] = [1433, 64, 1]
 
 dataset = args.dataset
-x_, edge_index_, y_ = parse_data(dataset, False)
+x_, edge_index_, y_ = parse_data(dataset)
 
 
-f1_scores = []
+f1_scores = []  
 
 N_ITER = 10
 
@@ -78,8 +76,11 @@ for i in range(N_ITER):
         model.train()
         optimizer.zero_grad()
         output = model(graph_data)[0].index_select(node_dim, all_indices)
+        # if (torch.max(output).item() > 0): print(torch.max(output).item())
+        output = torch.sigmoid(output)
         criterion = PULoss(nnpu=nnpu)
         loss = criterion(output[indices].view(-1), y_binary_train[indices]) # !CHECK
+
         loss.backward()
         optimizer.step()
         if verbose:
@@ -100,7 +101,7 @@ for i in range(N_ITER):
         return f1
 
     node_dim = 0
-    indices, y_binary_train, y_binary_test = make_binary(y_, 3, config['p'])
+    indices, y_binary_train, y_binary_test = make_binary(y_, config['class_label'], config['p'])
     x = x_.cuda().float()
     edge_index = edge_index_.cuda().long()
     y = torch.from_numpy(y_).cuda().float()
@@ -112,20 +113,16 @@ for i in range(N_ITER):
     device = torch.device("cuda")
 
     optimizer =  optim.Adam(model.parameters(), lr=1e-4)
-
-
     num_epochs = config["num_of_epochs"]
     epoch = 0
     nnpu = args.nnpu
     verbose = False
     while True:
-        cur_loss = train(epoch, False, nnpu)
+        cur_loss = train(epoch, verbose, nnpu)
         if epoch == config["num_of_epochs"]: break
-        
         prev_loss = cur_loss
         epoch += 1
 
     f1_scores.append(test(verbose, nnpu))
-    # print(f1_scores[-1])
 
 print(config["p"], np.mean(f1_scores),'±' ,np.std(f1_scores))

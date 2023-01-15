@@ -18,13 +18,14 @@ from scipy import sparse
 import torch as T
 import torch
 
-def normalize(mat):
-	"""mat gets row-normalized"""
-	row_sum = np.array(mat.sum(1)) + 1e-5
-	reciprocal = np.reciprocal(row_sum).flatten()
-	reciprocal[np.isinf(reciprocal)] = 0
-	reciprocal_mat = sparse.diags(reciprocal)
-	return reciprocal_mat.dot(mat)
+def normalize(mx):
+    """mat gets row-normalized"""
+    rowsum = np.array(mx.sum(1)).astype(float)
+    r_inv = np.power(rowsum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    mx = r_mat_inv.dot(mx)
+    return mx
 
 def get_sparse_tensor(mat):
 	mat = mat.tocoo().astype(np.float32)
@@ -34,8 +35,7 @@ def get_sparse_tensor(mat):
 	values = T.from_numpy(mat.data)
 	return T.sparse.FloatTensor(indices, values, T.Size(mat.shape))
 
-def parse_data(dataset, verbose=True):
-
+def parse_data(dataset):
     x = []
     with open('../data/{}/{}.txt'.format(dataset, 'feature'), 'r') as f:
         lines = f.readlines()
@@ -43,7 +43,10 @@ def parse_data(dataset, verbose=True):
         row = line.strip().split('\t')
         row = [int(item) for item in row]
         x.append(row)
-    x = T.from_numpy(normalize(np.array(x)))
+    x = normalize(np.array(x))
+    assert np.max(x) <= 1
+    assert np.min(x) >= 0
+    x = T.from_numpy(x)
 
     y = []
     with open('../data/{}/{}.txt'.format(dataset, 'group'), 'r') as f:
@@ -53,6 +56,7 @@ def parse_data(dataset, verbose=True):
         row = int(row[1])
         y.append(row)
     y = np.array(y)
+    assert np.min(y) >= 0
 
     E = []
     with open('../data/{}/{}.txt'.format(dataset, 'graph'), 'r') as f:
@@ -71,22 +75,17 @@ def parse_data(dataset, verbose=True):
 
     edge_index = torch.from_numpy(np.row_stack((source_ids, target_ids)))
 
-    # E = np.array(E)
-    # A = sparse.coo_matrix(
-    #     (np.ones(E.shape[0]), (E[:, 0], E[:, 1])),
-    #     (len(y), len(y)),
-    #     np.float32
-    # )
-    # A += A.T.multiply(A.T > A) - A.multiply(A < A.T) #? logic
-    # A = normalize(A + sparse.eye(len(y)))
-    # A = get_sparse_tensor(A)
+    if dataset == 'citeseer':
+        assert x.shape[0] == 3312
+        assert len(lines) == 4732
+        assert y.max() + 1 == 6
+        assert x.shape[1] == 3703
 
-
-
-
-    if verbose:
-        print("#Edges:", len(lines))
-        print("#Classes:", y.max() + 1)
+    elif dataset == 'cora':
+        assert x.shape[0] == 2708
+        assert len(lines) == 5429
+        assert y.max() + 1 == 7
+        assert x.shape[1] == 1433
     
     return x, edge_index, y
 
@@ -99,7 +98,7 @@ def make_binary(y, class_label, p):
     k = len(P)
     N_equal = np.random.choice(N, k, False)
     indices = np.concatenate((P, N_equal))
-    P_train = np.random.choice(P, int(k * p), False) #TODO: check ceil/floor
+    P_train = np.random.choice(P, int(k * p), False)
     y_binary_train[P_train] = 1
 
     np.random.shuffle(indices)
@@ -108,3 +107,8 @@ def make_binary(y, class_label, p):
     y_binary_test = torch.from_numpy(y_binary_test)
 
     return indices, y_binary_train, y_binary_test
+
+if __name__ == "__main__":
+    parse_data('cora')
+    parse_data('citeseer')
+
