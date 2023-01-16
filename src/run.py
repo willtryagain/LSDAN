@@ -1,13 +1,13 @@
 import subprocess
 
-
+import numpy as np
 
 DATASET = ['citeseer', 'cora']
 NNPU = [True, False]
 P = list(range(1, 6))
 BIAS = [True, False]
 SKIP_CONN = [True, False]
-DROPOUT = list(range(1, 10))
+DROPOUT = list(np.arange(1, 6, 0.5))
 
 DATASET = ['cora']
 NNPU = [False]
