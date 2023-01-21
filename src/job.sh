@@ -28,7 +28,7 @@ rsync -avz aman.atman@ada.iiit.ac.in:/home2/aman.atman/LSDAN/ --exclude=runs --e
 
 # Activate the conda environment
 eval "$(conda shell.bash hook)"
-conda activate g
+conda activate graph
 
 cd src
 ls

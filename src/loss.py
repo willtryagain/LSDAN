@@ -24,22 +24,24 @@ class PULoss(nn.Module):
         n_pos, n_unlb = torch.max(self.min_count, torch.sum(positive)),\
              torch.max(self.min_count, torch.sum(unlabelled))
         
-        y_pos = self.loss_func(inp, torch.ones_like(target)) * positive
-        y_pos_inv = self.loss_func(inp, torch.zeros_like(target)) * positive
+        y_pos = self.loss_func(inp, torch.ones_like(target)) 
+        # y_pos_inv = self.loss_func(inp, torch.zeros_like(target))
         # y_pos_inv = self.loss_func(inp, -torch.ones_like(target)) * positive
 
-        y_unlabelled = self.loss_func(inp, torch.zeros_like(target)) * unlabelled
+        y_unlabelled = self.loss_func(inp, torch.zeros_like(target)) 
         # y_unlabelled = self.loss_func(inp, -torch.ones_like(target)) * unlabelled
 
-        positive_risk = self.prior * torch.sum(y_pos) / n_pos
-        negative_risk = torch.sum(y_unlabelled) / n_unlb - self.prior * torch.sum(y_pos_inv) / n_pos
+        positive_risk = torch.sum(self.prior * positive / n_pos * y_pos) 
+        negative_risk = torch.sum((unlabelled / n_unlb - self.prior * positive / n_pos) * y_unlabelled)
 
+        
         if self.nnpu and negative_risk < -self.beta:
-            return positive_risk
+            print("negative_risk", negative_risk)
+            return positive_risk - self.beta
         else:
             return positive_risk + negative_risk
 
-
+'''
 class PULoss_(nn.Module):
     def __init__(self, prior=torch.tensor(0.5), loss=(lambda x: torch.sigmoid(-x)), beta=0, nnpu=True) -> None:
         super().__init__()
@@ -71,3 +73,4 @@ class PULoss_(nn.Module):
             return positive_risk
         else:
             return positive_risk + negative_risk
+'''

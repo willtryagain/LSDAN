@@ -7,23 +7,21 @@ NNPU = [True, False]
 P = list(range(1, 6))
 BIAS = [True, False]
 SKIP_CONN = [True, False]
-DROPOUT = list(np.arange(1, 6, 0.5))
+DROPOUT = list(np.arange(1, 9, 0.5))
 
 DATASET = ['cora']
-NNPU = [False]
-P = [5]
+NNPU = [True]
+P = [1]
 
 for data in DATASET:
     for nnpu in NNPU:
         for p_ in P:
-            for bias in BIAS:  
-                for add_skip_connection in SKIP_CONN:
-                        for d in DROPOUT:
-                            command = "python main.py --dataset={} --p={} ".format(data, p_/100)
-                            if nnpu: command += " --nnpu "
-                            if bias: command += " --bias "
-                            if add_skip_connection: command += " --add_skip_connection "
-                            command += "--dropout={} ".format(d/10)
-                            # print(command)
-                            subprocess.run(["echo", command])
-                            subprocess.run(command.split())
+            for d1 in DROPOUT:
+                for d2 in DROPOUT:
+                    command = "python pyg.py --dataset={} --p={} ".format(data, p_/100)
+                    if nnpu: command += " --nnpu "
+                    command += "--d1={} ".format(d1/10)
+                    command += "--d2={} ".format(d2/10)
+                    # print(command)
+                    subprocess.run(["echo", command])
+                    subprocess.run(command.split())
