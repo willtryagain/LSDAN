@@ -36,10 +36,10 @@ class PULoss(nn.Module):
 
         
         if self.nnpu and negative_risk < -self.beta:
-            print("negative_risk", negative_risk)
-            return positive_risk - self.beta
+            # print("negative_risk", negative_risk)
+            return positive_risk - self.beta, True
         else:
-            return positive_risk + negative_risk
+            return positive_risk + negative_risk, False
 
 '''
 class PULoss_(nn.Module):

@@ -116,11 +116,9 @@ for i in range(N_ITER):
         optimizer.zero_grad()
         out = model(data)
         # criterion = nn.BCELoss()
-        criterion = PULoss(nnpu=args.nnpu)
-        loss = criterion(out[data.indices].squeeze(1), data.y_train[data.indices])
-        
-        # if epoch%100 == 0:
-        #     print(loss.item())
+        criterion = PULoss(nnpu=args.nnpu, beta=0.1/2)
+        loss, flag = criterion(out[data.indices].squeeze(1), data.y_train[data.indices])
+        # if flag: print(loss.item())
         
         loss.backward()
         optimizer.step()
