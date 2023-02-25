@@ -18,6 +18,23 @@ from scipy import sparse
 import torch as T
 import torch
 
+
+class Data:
+    def __init__(self, x, y_train, y_test, edge_index, indices) -> None:
+        self.x = x.float()
+        self.edge_index = edge_index.int()
+        self.indices = indices
+        self.y_train = y_train.float()
+        self.y_test = y_test.float()
+        
+    def to(self, device):
+        self.x = self.x.to(device)
+        self.y_train = self.y_train.to(device)
+        self.y_test = self.y_test.to(device)
+        self.indices = self.indices.to(device)
+        self.edge_index = self.edge_index.to(device)
+        return self
+
 def normalize(mx):
     """mat gets row-normalized"""
     rowsum = np.array(mx.sum(1)).astype(float)
@@ -89,6 +106,76 @@ def parse_data(dataset):
     
     return x, edge_index, y
 
+def parse_data_lsdan(dataset, k=4):
+    x = []
+    with open('../data/{}/{}.txt'.format(dataset, 'feature'), 'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        row = line.strip().split('\t')
+        row = [int(item) for item in row]
+        x.append(row)
+    x = normalize(np.array(x))
+    assert np.max(x) <= 1
+    assert np.min(x) >= 0
+    x = T.from_numpy(x)
+
+    y = []
+    with open('../data/{}/{}.txt'.format(dataset, 'group'), 'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        row = line.strip().split('\t')
+        row = int(row[1])
+        y.append(row)
+    y = np.array(y)
+    assert np.min(y) >= 0
+
+    E = []
+    A = np.zeros((x.shape[0], x.shape[0]))
+    with open('../data/{}/{}.txt'.format(dataset, 'graph'), 'r') as f:
+        lines = f.readlines()
+
+    source_ids, target_ids = [], []
+    for line in lines:
+        row = line.strip().split('\t')
+        u = int(row[0])
+
+        v = int(row[1])
+        A[u, v] = 1
+    A_cur = A.copy()
+
+    for i in range(k):
+        if i != 0: A_cur = A_cur @ A
+        cur_source_ids, cur_target_ids = [], []
+        cnt = 0
+        for u in range(A_cur.shape[0]):
+            for v in range(A_cur.shape[1]):
+                if A_cur[u, v] == 0: continue
+                cur_source_ids.append(u)
+                cur_target_ids.append(v)
+                cnt += 1
+        source_ids.append(cur_source_ids)
+        target_ids.append(cur_target_ids)
+
+    edge_indices = []
+    for i in range(k):
+        edge_index = torch.from_numpy(np.row_stack((source_ids[i], target_ids[i])))
+        edge_indices.append(edge_index)
+
+
+    if dataset == 'citeseer':
+        assert x.shape[0] == 3312
+        assert len(lines) == 4732
+        assert y.max() + 1 == 6
+        assert x.shape[1] == 3703
+
+    elif dataset == 'cora':
+        assert x.shape[0] == 2708
+        assert len(lines) == 5429
+        assert y.max() + 1 == 7
+        assert x.shape[1] == 1433
+    
+    return x, edge_indices, y
+
 def make_binary(y, class_label, p):
     mask = y == class_label
     y_binary_test = mask.astype(int)
@@ -109,6 +196,8 @@ def make_binary(y, class_label, p):
     return indices, y_binary_train, y_binary_test
 
 if __name__ == "__main__":
-    parse_data('cora')
-    parse_data('citeseer')
+    x, edge_indices, y =  parse_data('cora')
+    # x, edge_indices, y =  parse_data('citeseer')
 
+    for i in range(4):
+        print(edge_indices[i][0].shape)
