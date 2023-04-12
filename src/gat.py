@@ -11,7 +11,7 @@ from torch_geometric.nn import GATConv
 
 
 class GAT(torch.nn.Module):
-    def __init__(self, d1, d2, n_classes, num_node_features, type='gat', return_attention_weights=True):
+    def __init__(self, d1, d2, n_classes, num_node_features, type='gat', return_attention_weights=False):
         super().__init__()
         if type == 'gat':
             self.hid = 8
@@ -37,14 +37,14 @@ class GAT(torch.nn.Module):
         # edge_index : (2, 10556)
         #-------------------------------------#
         x = F.dropout(x, p=self.d2, training=self.training)
-        x, _ = self.conv1(x, edge_index)
+        x = self.conv1(x, edge_index)
         #-------------------------------------#
         # x : (2708, 64)
         # 64 : hid 차원(8) x head 개수 (8)
         #-------------------------------------#
         x = F.elu(x)
         x = F.dropout(x, p=self.d2, training=self.training)
-        x, _ = self.conv2(x, edge_index)
+        x = self.conv2(x, edge_index)
         #-------------------------------------#
         # x : (2708, 7)
         #-------------------------------------#
