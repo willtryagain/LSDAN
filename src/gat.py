@@ -48,5 +48,4 @@ class GAT(torch.nn.Module):
         #-------------------------------------#
         # x : (2708, 7)
         #-------------------------------------#
-        return torch.sigmoid(x)        
-        return F.log_softmax(x, dim=1)
+        return x
