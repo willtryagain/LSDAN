@@ -9,8 +9,6 @@ from sklearn.metrics import f1_score
 
 import numpy as np
 
-from GAT import GAT
-from utils import *
 from data_loading import parse_data, make_binary
 from loss import PULoss
 
@@ -33,7 +31,6 @@ config = {
     "add_skip_connection": args.bias,  # hurts perf on Cora
     "bias": args.add_skip_connection,  # result is not so sensitive to bias
     "dropout": args.dropout,  # result is sensitive to dropout
-    "layer_type": LayerType.IMP3,  # fastest implementation enabled by default
     "num_of_epochs": 500,
     "p": args.p,
 }
