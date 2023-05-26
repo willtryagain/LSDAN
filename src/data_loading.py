@@ -11,7 +11,6 @@ import torch
 from torch.hub import download_url_to_file
 from torch.utils.data import DataLoader, Dataset
 
-from utils import *
 
 import numpy as np
 from scipy import sparse

@@ -1,81 +1,59 @@
-import math
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-from torch.nn.modules.module import Module
+from torch_geometric.datasets import Planetoid
 
-Label = {
-    "-1": 0,
-    "1": 1
-}
+from loss import GRABLoss
+from models.gcn import GCN
+from lbp import LBP
+from data_loading import parse_planetoid_data
 
-class GRABLoss(nn.Module):
-    def __init__(self, loss=(lambda x: torch.sigmoid(x))) -> None:
-        super().__init__()
-        self.loss_func = loss
-        self.positive = Label["1"]
-        self.unlabelled = Label["-1"]
 
-    def forward(self, inp, target, b):
-        positive, unlabelled = target == self.positive, target == self.unlabelled
-        positive, unlabelled = positive.type(torch.float), unlabelled.type(torch.float)
-        n_pos, n_unlb = torch.sum(positive), torch.sum(unlabelled)
+class GRAB:
+    def __init__(self, data, epochs=1000) -> None:
+        self.data = data
+        self.model = GCN(data.num_features, 1)
+        self.epochs = epochs
 
-        # inp [n, 1] to [n, 2] where the second column is 1 - inp
-        inp = torch.cat((inp, 1 - inp), dim=1)
-        target = torch.cat((target, 1 - target), dim=1)
-        # element wise dot product
-        prod = torch.sum(inp * target, dim=-1)
-        y_pos = self.loss_func(prod) * positive
-        
-        prod = torch.sum(inp * b, dim=-1)
-        y_unlabelled = self.loss_func(prod) * unlabelled
-        positive_risk = torch.sum(y_pos) / n_pos
-        unlb_risk = torch.sum(y_unlabelled) / n_unlb
-        
-        return positive_risk + unlb_risk
-    
-def GRAB(data):
-    l_new = float("inf")
-    prior_new = 0
-    epoch = 0
-
-    while True:
-        l, prior = l_new, prior_new
-
-        if epoch % 10 == 0:
-            print("GRAB epoch:", epoch)
-
-        B = LBP(prior, data)
-        print(B)
-
-        model = GCN(data.num_features, 1)
-        optimizer = torch.optim.Adam(model.parameters())
+    def train(self, B):
+        optimizer = torch.optim.Adam(self.model.parameters())
         loss_func = GRABLoss()
 
-        for epoch in range(1000):
-            model.train()
+        for epoch in range(self.epochs):
+            self.model.train()
             optimizer.zero_grad()
-            out = model(data)
-            loss = loss_func(out, data.y_train.view(-1, 1), B)
+            out = self.model(self.data)
+            loss = loss_func(out, self.data.y_train.view(-1, 1), B)
             loss.backward()
             optimizer.step()
 
             if epoch % 100 == 0:
                 print('Epoch: {:03d}, Loss: {:.5f}'.format(epoch, loss.item()))
 
-        model.eval()
-        out = model(data)
-        l_new = loss_func(out, data.y.view(-1, 1), B)
+        self.model.eval()
+        out = self.model(self.data)
+        l_new = loss_func(out, self.data.y.view(-1, 1), B)
         pred = out > 0.5
-        prior_new = torch.sum(pred[data.PU_mask]) / torch.sum(data.PU_mask)
+        prior_new = torch.sum(pred[self.data.U_mask]) / torch.sum(self.data.U_mask)
 
-        if l_new > l:
-            break
+        return prior_new, l_new
+    
+    def run(self):
+        l_new = torch.tensor(float('inf'))
+        prior_new = torch.tensor(0.0)
 
-        l = l_new
-        epoch += 1
+        epoch = 0
+        while True:
+            l, prior = l_new, prior_new
+            lbp = LBP(prior, data.edge_index, data.U_mask)
+            lbp.run()
+            B = lbp.belief()
+            prior_new, l_new = self.train(B)
+            epoch += 1
+            print(epoch, prior_new, l_new)
+            if l < l_new:
+                break
 
-    return prior_new, l_new, model
+if __name__ == "__main__":
+    dataset = Planetoid(root='../data', name="Cora")
+    data, prior = parse_planetoid_data(dataset, known_prior=True)
+    grab = GRAB(data)
+    grab.run()

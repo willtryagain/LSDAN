@@ -1,10 +1,43 @@
 import math
+from enum import Enum
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
+import torch
+import torch.nn as nn
+
+class Label(Enum):
+    POSITIVE = 1
+    UNLABELED = 0
+
+class GRABLoss(nn.Module):
+    def __init__(self, loss=(lambda x: torch.sigmoid(x))) -> None:
+        super().__init__()
+        self.loss_func = loss
+        self.positive = Label.POSITIVE
+        self.unlabelled = Label.UNLABELED
+
+    def forward(self, inp, target, b):
+        positive, unlabelled = target == self.positive.value, target == self.unlabelled.value
+        positive, unlabelled = positive.type(torch.float), unlabelled.type(torch.float)
+        n_pos, n_unlb = torch.sum(positive), torch.sum(unlabelled)
+
+        # inp [n, 1] to [n, 2] where the second column is 1 - inp
+        inp = torch.cat((inp, 1 - inp), dim=1)
+        target = torch.cat((target, 1 - target), dim=1)
+        # element wise dot product
+        prod = torch.sum(inp * target, dim=-1)
+        y_pos = self.loss_func(prod) * positive
+
+        prod = torch.sum(inp * b, dim=-1)
+        y_unlabelled = self.loss_func(prod) * unlabelled
+        positive_risk = torch.sum(y_pos) / n_pos
+        unlb_risk = torch.sum(y_unlabelled) / n_unlb
+
+        return positive_risk + unlb_risk
 
 
 class PULoss(nn.Module):
@@ -43,3 +76,4 @@ class PULoss(nn.Module):
             return positive_risk - self.beta
         else:
             return positive_risk + negative_risk
+        
