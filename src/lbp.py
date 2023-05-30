@@ -18,14 +18,13 @@ class LBP:
         self.edges = edges
         self.mask = U_mask
         self.homophily = homophily
-        self.node_potential = torch.ones(self.mask.shape[0], 2)
-        self.node_potential[self.mask][Label.POSITIVE.value] = prior
-        self.node_potential[self.mask][Label.UNLABELLED.value] = 1 - prior
+        self.num_nodes = self.mask.shape[0]
+        self.node_potential = torch.ones(self.num_nodes, 2)
         self.node_potential[~self.mask][Label.POSITIVE.value] = 1
         self.node_potential[~self.mask][Label.UNLABELLED.value] = 0
-        self.num_nodes = self.mask.shape[0]
+        self.node_potential[self.mask][Label.POSITIVE.value] = prior
+        self.node_potential[self.mask][Label.UNLABELLED.value] = 1 - prior
         self.messages = torch.fill_(torch.empty(self.edges.shape[1], 2), 0.5)
-        self.message_prod = torch.ones(self.num_nodes, 2)
         self.edge_to_index = {}
         self.neighbors = {}
         for index in range(self.edges.shape[1]):
@@ -45,17 +44,9 @@ class LBP:
         else:
             return 1 - self.homophily
         
-    def message_product(self):
-        self.message_prod = torch.ones(self.num_nodes, 2)
-        for index in range(self.edges.shape[1]):
-            i, j = self.edges[0][index], self.edges[1][index]
-            i, j = int(i), int(j)
-            for u in [Label.POSITIVE.value, Label.UNLABELLED.value]:
-                self.message_prod[j][u] *= self.messages[index][u]
-        
     def convergence(self, prev_messages):
         diff = torch.max(torch.abs(self.messages - prev_messages))
-        return diff < 1e-2
+        return diff < 1e-4
         
     def run(self):
         epoch = 0
@@ -70,18 +61,28 @@ class LBP:
                     self.messages[index][v] = 0
                     for u in [Label.POSITIVE.value, Label.UNLABELLED.value]:
                         psi = self.edge_potential(u, v)
-                        self.messages[index][v] += self.node_potential[i][u] * psi 
-
+                        cur_value = self.node_potential[i][u] * psi 
                         for k in self.neighbors[i]:
-                            if k != j:
-                                index_ki = self.get_index_from_edge(k, i)
-                                self.messages[index][v] *= prev_messages[index_ki][u]
+                            if k == j: continue
+                            index_ki = self.get_index_from_edge(k, i)
+                            cur_value *= prev_messages[index_ki][u]
+                        self.messages[index][v] += cur_value
+
+            # check if messages sum to 1
+            s = torch.sum(self.messages, dim=1)
+            assert torch.all(torch.abs(s - torch.ones(s.shape)) < 1e-4)
+
+            mask = self.messages != prev_messages
+            print(epoch)
+            print("message", self.messages[mask])
+            print("prev", prev_messages[mask])
                     
+
             if epoch % 10 == 0:
                 print("Epoch: {}".format(epoch), "Error: {}".format(torch.max(torch.abs(self.messages - prev_messages))))
             if self.convergence(prev_messages):
                 # self.message_product()
-                print("Converged in {} epochs".format(epoch))
+                print("LBP converged in {} epochs".format(epoch))
                 break
         
     def belief(self):

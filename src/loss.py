@@ -14,7 +14,7 @@ class Label(Enum):
     UNLABELED = 0
 
 class GRABLoss(nn.Module):
-    def __init__(self, loss=(lambda x: torch.sigmoid(x))) -> None:
+    def __init__(self, loss=(lambda x: torch.sigmoid(-x))) -> None:
         super().__init__()
         self.loss_func = loss
         self.positive = Label.POSITIVE
@@ -27,7 +27,7 @@ class GRABLoss(nn.Module):
 
         # inp [n, 1] to [n, 2] where the second column is 1 - inp
         inp = torch.cat((inp, 1 - inp), dim=1)
-        target = torch.cat((target, 1 - target), dim=1)
+        target = torch.cat((1 - target, target), dim=1)
         # element wise dot product
         prod = torch.sum(inp * target, dim=-1)
         y_pos = self.loss_func(prod) * positive
